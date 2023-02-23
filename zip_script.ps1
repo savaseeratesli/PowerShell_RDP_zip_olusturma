@@ -1,64 +1,69 @@
-﻿#Bağlanılacak Sunucu Bilgilerinin Alınması
+#Bağlanılacak Sunucu Bilgilerinin Alınması
 #Kullancıdan Al
-$Username = Read-Host "Sunucu Kullanıcı Adını Giriniz"
-$Password = Read-Host "Sunucu Kullanıcı Şifresini Giriniz" 
-
+$Username = Read-Host "Kullanıcı Adı"
+$Password = Read-Host "Şifre"
+Write-Host "`n"
 $pass = ConvertTo-SecureString -AsPlainText $Password -Force
+$credential = new-object -typename System.Management.Automation.PSCredential -argumentlist $Username,$pass
 
- foreach($IP in Get-Content D:\denemeD\ipler.txt) {
-    echo "$IP Adresine Bağlanıldı";
-    #baglanilan ip uzerinde yapilacak islemler buranin icerisinde
-    #Start-Sleep -Seconds 2;
+#İşlemlerin yapılacağı sunucu listesi. 
+$IPS = "D:\denemeD\ipler.txt" 
 
-    $credential = new-object -typename System.Management.Automation.PSCredential -argumentlist $Username,$pass
+foreach($IP in Get-Content $IPS) 
+{
+    echo "$IP Adresine Bağlanıldı"
     Invoke-Command -ComputerName $IP -Credential $credential -ScriptBlock { 
 
-#Scriptin silme işlemi yapacağı klasör
-$TargetFolder = Read-Host "İşlemin Yapılacağı Uzantıyı Giriniz"
+    #Son oluşturma tarihi X günden az olanlar silinecektir 
+    $file_age = "3"
 
-#Dosyaları zipini alıp zipleme
-Compress-Archive -Path "$TargetFolder\*.txt" -DestinationPath "$TargetFolder\txt_Dökümanlar.zip"
-Compress-Archive -Path "$TargetFolder\*.xlsx" -DestinationPath "$TargetFolder\xlsx_Dökümanlar.zip"
+    #Klasör içinde silinecek dosya uzantıları 
+    $filetype1 = "*.txt"
+    $filetype2 = "*.csv"
 
-Start-Sleep -Seconds 5;
+    #Scriptin silme işlemi yapacağı dizin
+    $TargetFolder = "C:\CSVFormat\"
 
-#Klasör içinde silinecek dosyaların özellikleri 
-$filetype1 = "*.txt"
-$filetype2 = "*.xlsx"
+    #Scriptin yedek alacağı dizin
+    $DestinationPATH = "D:\Yedek\"
 
-#Bunları içerenleri silme
-$namefilter_1="Silinen"
-$namefilter_2="Dökümanlar"
+    #Silinecek dosya isminde aşağıdaki kelimeler varsa silme haricinde tutulur 
+    $namefilter_1="Silinen"
+    $namefilter_2="Dokümanlar"
+    
+    #Silme işleminin yapılacağı dizindeki dosyaların filtrelenmesi
+    $TFiles = Get-ChildItem $TargetFolder -recurse -include $filetype1,$filetype2
 
-#Son üç günden sonrasını sil 
-$file_age = "0"
+    Write-Output "Zipleme ve Silme İşlemlerine Başlanıyor"
 
-Start-Sleep -Seconds 10
+    #İşlemlerin yapılacağı klasör altındaki dosyaları kontrol etme işlemleri
+    foreach ($File in $TFiles)
+    {
+    
+    #Eğer klasör içinde belirtilen tarihte dosya varsa ve dosyanın uzantısı .txt ise
+    if (($File.Lastwritetime -lt ($(Get-Date).AddDays(-$file_age))) -and ("*$($File.Extension)" -like $filetype1))
+    {
+            #Txt dosyalarını zipleme ve silme işlemi
+            Compress-Archive $File -DestinationPath "$DestinationPATH\txt_Dokümanlar.zip" -Update
+            Write-Output "$($File) dosyası ziplendi."
 
-foreach ($i in Get-ChildItem $TargetFolder -recurse -include $filetype1,$filetype2)
-{
+            Remove-Item $File -force
+            Write-Output "$($File) dosyası silindi."
+    }
+    #Eğer klasör içinde belirtilen tarihte dosya varsa ve dosyanın uzantısı .csv ise
+    if (($File.Lastwritetime -lt ($(Get-Date).AddDays(-$file_age))) -and ("*$($File.Extension)" -like $filetype2))
+    {
+            #Csv dosyalarını zipleme ve silme işlemi
+            Compress-Archive $File -DestinationPath "$DestinationPATH\csv_Dokümanlar.zip" -Update
+            Write-Output "$($File) dosyası ziplendi."
 
-if (($i.Lastwritetime -lt($(Get-Date).AddDays(-$file_age))) -and ($i.name -notmatch $namefilter_1) -and ($i.name -notmatch $namefilter_2))
-{
+            Remove-Item $File -force
+            Write-Output "$($File) dosyası silindi."
+    }
+    }
 
-#Silinen dosyaları belirtilen dosyaya yazsın.
-echo $i.Name $i.LastWriteTime >> "$TargetFolder\SilinenDökümanlar.txt"
-Remove-Item $i -force 
-
+    #Zip dosyalarını isimlendirme
+    Get-ChildItem "$DestinationPATH" -Filter "*Dokümanlar.zip" -Recurse | Rename-Item -NewName {$_.BaseName + $_.LastWriteTime.toString("_hhmm_yyyyMMdd") + ".zip"}
+    }
+    Write-Output "$($IP) Sunucusunda Zipleme ve Silme İşlemleri Tamamlanmıştır.`n"
 }
-}
-
-#Dosyaları sil zip al
-Get-ChildItem $TargetFolder -Filter "*Dökümanlar.zip" -Recurse | Rename-Item -NewName {$_.BaseName + $_.LastWriteTime.toString("_yyyyMMdd") + ".zip"}
-
-echo "İşlem Tamamlanmıştır."
-
-}
-
-}
-
-
-
-
-
-
